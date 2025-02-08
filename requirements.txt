@@ -1,2 +1,2 @@
-echo "aiogram" > requirements.txt
-echo "python-dotenv" >> requirements.txt
+aiogram
+python-dotenv
