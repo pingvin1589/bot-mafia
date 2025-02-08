@@ -7,7 +7,7 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.bot import DefaultBotProperties
 
-# Загружаем переменные из Render (они заменяют config.json)
+# Загружаем переменные окружения (замена config.json)
 DATE = os.getenv("DATE", "Не указано")
 TIME = os.getenv("TIME", "Не указано")
 PLACE = os.getenv("PLACE", "Не указано")
@@ -17,8 +17,10 @@ EVENT_TEXT = os.getenv("EVENT_TEXT", "Описание мероприятия о
 
 # Загружаем токен и ID чата
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
 CHAT_ID = int(os.getenv("CHAT_ID"))
+
+# Список админов
+ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "").split(",")))
 
 logging.basicConfig(level=logging.INFO)
 
@@ -78,12 +80,13 @@ async def start_handler(message: types.Message):
 # Обработчик команды /stop – отключает запись, но список сохраняется
 @dp.message(Command("stop"))
 async def stop_handler(message: types.Message):
-    global registration_open
-    if message.from_user.id == ADMIN_ID:
-        registration_open = False
-        await bot.send_message(CHAT_ID, "🚫 **Запись закрыта!**", reply_markup=get_keyboard())
-    else:
+    if message.from_user.id not in ADMIN_IDS:
         await message.answer("🚫 У вас нет прав для этой команды.")
+        return
+
+    global registration_open
+    registration_open = False
+    await bot.send_message(CHAT_ID, "🚫 **Запись закрыта!**", reply_markup=get_keyboard())
 
 # Обработчик команды /list – выводит текущий список
 @dp.message(Command("list"))
@@ -106,48 +109,21 @@ async def join_game(callback: types.CallbackQuery):
 
     await callback.answer("✅ Вы записаны как игрок!")
 
-# Обработчик кнопки "Записаться зрителем"
-@dp.callback_query(F.data == "spectate")
-async def spectate_game(callback: types.CallbackQuery):
-    if not registration_open:
-        await callback.answer("🚫 Запись закрыта!", show_alert=True)
-        return
-
-    user_name = callback.from_user.full_name
-    if user_name not in spectators:
-        spectators.append(user_name)
-        if user_name in players:
-            players.remove(user_name)
-        await bot.send_message(CHAT_ID, generate_list(), reply_markup=get_keyboard())
-
-    await callback.answer("👀 Вы записаны как зритель!")
-
-# Обработчик кнопки "Удалить запись"
-@dp.callback_query(F.data == "leave")
-async def leave_game(callback: types.CallbackQuery):
-    user_name = callback.from_user.full_name
-    if user_name in players:
-        players.remove(user_name)
-    if user_name in spectators:
-        spectators.remove(user_name)
-    await bot.send_message(CHAT_ID, generate_list(), reply_markup=get_keyboard())
-
-    await callback.answer("🚫 Вы удалены из списка.")
-
-# Обработчик команды /reset (только для администратора)
+# Обработчик команды /reset (только для администраторов)
 @dp.message(Command("reset"))
 async def reset_handler(message: types.Message):
-    if message.from_user.id == ADMIN_ID:
-        players.clear()
-        spectators.clear()
-        await bot.send_message(CHAT_ID, "🗑 Список участников очищен!", reply_markup=get_keyboard())
-    else:
+    if message.from_user.id not in ADMIN_IDS:
         await message.answer("🚫 У вас нет прав для этой команды.")
+        return
+
+    players.clear()
+    spectators.clear()
+    await bot.send_message(CHAT_ID, "🗑 Список участников очищен!", reply_markup=get_keyboard())
 
 # Обработчик команды /add (админ может добавить игрока вручную)
 @dp.message(Command("add"))
 async def add_player(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
+    if message.from_user.id not in ADMIN_IDS:
         await message.answer("🚫 У вас нет прав для этой команды.")
         return
     
