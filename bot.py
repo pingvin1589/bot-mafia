@@ -107,9 +107,11 @@ async def join_game(callback: types.CallbackQuery):
 
     await callback.answer("✅ Вы записаны как игрок!")
 
-# Обработчик кнопки "Записаться зрителем"
+# Обработчик кнопки "Записаться зрителем" (исправлено)
 @dp.callback_query(F.data == "spectate")
 async def spectate_game(callback: types.CallbackQuery):
+    logging.info(f"🔄 Нажата кнопка 'Записаться зрителем' пользователем: {callback.from_user.full_name}")
+
     if not registration_open:
         await callback.answer("🚫 Запись закрыта!", show_alert=True)
         return
@@ -118,15 +120,17 @@ async def spectate_game(callback: types.CallbackQuery):
     if user_name not in spectators:
         spectators.append(user_name)
         if user_name in players:
-            players.remove(user_name)
-        await bot.send_message(CHAT_ID, generate_list(), reply_markup=get_keyboard())
+            players.remove(user_name)  # Убираем из списка игроков, если он там был
 
-    await callback.answer("👀 Вы записаны как зритель!")
+        await bot.send_message(CHAT_ID, generate_list(), reply_markup=get_keyboard())
+        await callback.answer("👀 Вы записаны как зритель!")
+    else:
+        await callback.answer("ℹ️ Вы уже в списке зрителей.")
 
 # Обработчик кнопки "Удалить запись"
 @dp.callback_query(F.data == "leave")
 async def leave_game(callback: types.CallbackQuery):
-    logging.info(f"🔄 Получен callback: {callback.data} от {callback.from_user.full_name}")
+    logging.info(f"🔄 Нажата кнопка 'Удалить запись' пользователем: {callback.from_user.full_name}")
 
     user_name = callback.from_user.full_name
     if user_name in players:
