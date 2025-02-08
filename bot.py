@@ -86,10 +86,10 @@ async def stop_handler(message: types.Message):
     registration_open = False
     await bot.send_message(CHAT_ID, "🚫 **Запись закрыта!**", reply_markup=get_keyboard())
 
-# Обработчик команды /list – выводит текущий список
+# Обработчик команды /list – выводит текущий список с кнопками
 @dp.message(Command("list"))
 async def list_handler(message: types.Message):
-    await message.answer(generate_list())
+    await bot.send_message(CHAT_ID, generate_list(), reply_markup=get_keyboard())
 
 # Обработчик кнопки "Записаться"
 @dp.callback_query(F.data == "join")
@@ -107,7 +107,7 @@ async def join_game(callback: types.CallbackQuery):
 
     await callback.answer("✅ Вы записаны как игрок!")
 
-# Обработчик кнопки "Записаться зрителем" (исправлено)
+# Обработчик кнопки "Записаться зрителем"
 @dp.callback_query(F.data == "spectate")
 async def spectate_game(callback: types.CallbackQuery):
     logging.info(f"🔄 Нажата кнопка 'Записаться зрителем' пользователем: {callback.from_user.full_name}")
@@ -120,7 +120,7 @@ async def spectate_game(callback: types.CallbackQuery):
     if user_name not in spectators:
         spectators.append(user_name)
         if user_name in players:
-            players.remove(user_name)  # Убираем из списка игроков, если он там был
+            players.remove(user_name)
 
         await bot.send_message(CHAT_ID, generate_list(), reply_markup=get_keyboard())
         await callback.answer("👀 Вы записаны как зритель!")
@@ -141,11 +141,22 @@ async def leave_game(callback: types.CallbackQuery):
     await bot.send_message(CHAT_ID, generate_list(), reply_markup=get_keyboard())
     await callback.answer("🚫 Вы удалены из списка.")
 
-# Логирование всех callback-запросов (для диагностики)
-@dp.callback_query()
-async def debug_callback(callback: types.CallbackQuery):
-    logging.info(f"⚠️ Бот получил callback: {callback.data}")
-    await callback.answer("🔍 Callback получен, но не обработан.")
+# Обработчик команды /add (теперь список обновляется)
+@dp.message(Command("add"))
+async def add_player(message: types.Message):
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer("🚫 У вас нет прав для этой команды.")
+        return
+
+    command_parts = message.text.split(maxsplit=1)
+    if len(command_parts) < 2:
+        await message.answer("❌ Используйте команду в формате:\n`/add Иван Иванов`", parse_mode="Markdown")
+        return
+
+    new_player = command_parts[1].strip()
+    if new_player not in players:
+        players.append(new_player)
+        await bot.send_message(CHAT_ID, generate_list(), reply_markup=get_keyboard())
 
 # Обработчик команды /reset (только для администратора)
 @dp.message(Command("reset"))
